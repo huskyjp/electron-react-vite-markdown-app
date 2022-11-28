@@ -1,54 +1,53 @@
 /* eslint-env node */
 
-import {chrome} from '../../.electron-vendors.cache.json';
-import vue from '@vitejs/plugin-vue';
-import {renderer} from 'unplugin-auto-expose';
-import {join} from 'node:path';
-import {injectAppVersion} from '../../version/inject-app-version-plugin.mjs';
+import { chrome } from '../../electron-vendors.config.json'
+import { join } from 'path'
+import { builtinModules } from 'module'
+import { defineConfig } from 'vite'
+import { loadAndSetEnv } from '../../scripts/loadAndSetEnv.mjs'
 
-const PACKAGE_ROOT = __dirname;
-const PROJECT_ROOT = join(PACKAGE_ROOT, '../..');
+const PACKAGE_ROOT = __dirname
 
 /**
- * @type {import('vite').UserConfig}
+ * Vite looks for `.env.[mode]` files only in `PACKAGE_ROOT` directory.
+ * Therefore, you must manually load and set the environment variables from the root directory above
+ */
+loadAndSetEnv(process.env.MODE, process.cwd())
+
+/**
  * @see https://vitejs.dev/config/
  */
-const config = {
-  mode: process.env.MODE,
+export default defineConfig({
   root: PACKAGE_ROOT,
-  envDir: PROJECT_ROOT,
   resolve: {
     alias: {
-      '/@/': join(PACKAGE_ROOT, 'src') + '/',
-    },
+      '/@/': join(PACKAGE_ROOT, 'src') + '/'
+    }
   },
+  plugins: [],
   base: '',
   server: {
-    fs: {
-      strict: true,
-    },
+    fsServe: {
+      root: join(PACKAGE_ROOT, '../../')
+    }
   },
   build: {
     sourcemap: true,
     target: `chrome${chrome}`,
     outDir: 'dist',
     assetsDir: '.',
-    rollupOptions: {
-      input: join(PACKAGE_ROOT, 'index.html'),
+    terserOptions: {
+      ecma: 2020,
+      compress: {
+        passes: 2
+      },
+      safari10: false
     },
-    emptyOutDir: true,
-    reportCompressedSize: false,
-  },
-  test: {
-    environment: 'happy-dom',
-  },
-  plugins: [
-    vue(),
-    renderer.vite({
-      preloadEntry: join(PACKAGE_ROOT, '../preload/src/index.ts'),
-    }),
-    injectAppVersion(PROJECT_ROOT),
-  ],
-};
-
-export default config;
+    rollupOptions: {
+      external: [
+        ...builtinModules.filter(m => m !== 'process' && m !== 'assert')
+      ]
+    },
+    emptyOutDir: true
+  }
+})
